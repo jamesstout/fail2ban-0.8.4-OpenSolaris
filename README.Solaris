@@ -97,6 +97,13 @@ GOTCHAS AND FIXMES
     svcadm disable fail2ban
     svcadm enable fail2ban
 
+* If svcs -xv says that fail2ban failed to start or svcs says it's in maintenance mode
+  chcek /var/svc/log/network-fail2ban:default.log for clues. 
+  Check permissions on /var/adm, /var/adm/auth.log /var/adm/fail2ban.log and /var/run/fail2ban
+  You may need to:
+
+  sudo mkdir /var/run/fail2ban
+
 * Fail2ban adds lines like these to /etc/hosts.deny:
 
     ALL: 1.2.3.4
