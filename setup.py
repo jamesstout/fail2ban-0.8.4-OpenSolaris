@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# vim:ts=8:sw=8:si
 
 # This file is part of Fail2Ban.
 #
@@ -31,6 +32,7 @@ from common.version import version
 from os.path import isfile, join, isdir
 from sys import argv
 from glob import glob
+import os
 
 longdesc = '''
 Fail2Ban scans log files like /var/log/pwdfail or
@@ -129,3 +131,7 @@ if argv[1] == "install":
 	print "Please do not forget to update your configuration files."
 	print "They are in /etc/fail2ban/."
 	print
+
+	osname = os.uname()[0]
+	if osname == "SunOS":
+		print "Please read README.Solaris for installing this as Solaris service"
