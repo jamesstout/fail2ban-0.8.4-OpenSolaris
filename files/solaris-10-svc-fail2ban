@@ -2,7 +2,11 @@
 #
 # fail2ban		This init.d script is used to start fail2ban.
 # (C) by Hanno Wagner <wagner@rince.de>, License is GPL
- 
+#
+# 2013-03-28 - James Stout
+# Applied patch to run fail2ban on Solaris 10 OpenSolaris, OpenIndiana etc.
+# from https://www.illumos.org/attachments/68/fail2ban-solaris.patch
+# 
 #set -x
 
 . /lib/svc/share/smf_include.sh
