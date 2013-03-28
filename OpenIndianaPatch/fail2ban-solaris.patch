@@ -1,0 +1,330 @@
+Index: README.Solaris
+===================================================================
+--- README.Solaris	(revision 0)
++++ README.Solaris	(revision 467)
+@@ -0,0 +1,104 @@
++# vim:tw=80:ft=txt
++
++README FOR SOLARIS INSTALLATIONS
++
++By Roy Sigurd Karlsbakk <roy@karlsbakk.net>
++
++ABOUT
++
++This readme is meant for those wanting to install fail2ban on Solaris 10,
++OpenSolaris, OpenIndiana etc. To some degree it may as well be useful for
++users of older Solaris versions and Nexenta, but don't rely on it.
++
++READ ME FIRST
++
++If I use the term Solaris, I am talking about any Solaris dialect, that is, the
++official Sun/Oracle ones or derivates. If I describe an OS as
++"OpenSolaris-based", it means it's either OpenSolaris, OpenIndiana or one of the
++other, but /not/ the Nexenta family, since this only uses the OpenSolaris/
++IllumOS kernel and not the userland. If I say Solaris 10, I mean Solaris 10 and
++perhaps, if you're lucky and have some good gods on your side, it may also apply
++to Solaris 9 or even 8 and hopefully in the new Solaris 11 whenever that may be
++released. Quoted lines of code, settings et cetera are indented with two spaces.
++This does _not_ mean you should use that indentation, especially in config files
++where they can be harmful. Optional settings are prefixed with OPT: while
++required settings are prefixed with REQ:. If no prefix is found, regard it as a
++required setting.
++
++INSTALLATION ON SOLARIS
++
++The installation is straight forward on Solaris as well as on linux/bsd/etc.
++./setup.py install installs the general packages in /usr/bin on OpenSolaris-
++based distros or (at least on this box) under /usr/sfw/bin on Solaris 10. In
++the files/ directory you will find the file solaris-fail2ban.xml containing the
++Solaris service. To install this, run the following command as root (or with
++sudo):
++
++  svccfg import files/solaris-fail2ban.xml
++
++This should normally without giving an error. If you get an error, deal with it,
++and please post any relevant info (or fixes?) to the fail2ban mailing list.
++Next, there are two more files in the files/ directory from which you can
++choose. These are opensolaris-svc-fail2ban and solaris-10-svc-fail2ban. The
++former is for OpenSolaris-based distros and the latter for Solaris 10. The only
++difference is that the former uses the path of /usr/bin and the latter
++/usr/sfw/bin for the fail2ban program files. To install the service handler,
++copy the script in and allow it to be executed:
++
++  cp files/opensolaris-svc-fail2ban /lib/svc/method/svc-fail2ban
++  chmod +x /lib/svc/method/svc-fail2ban
++
++CONFIGURE SYSLOG
++
++For some reason, a default Solaris installation does not log ssh login attempts,
++and since fail2ban works by monitoring logs, enabling this logging is rather
++important for it to work. To enable this, edit /etc/syslog.conf and add a line
++at the end:
++
++  auth.info					/var/adm/auth.log
++
++Save the file and exit, and run
++
++  touch /var/adm/auth.log
++
++The Solaris system logger will _not_ create a non-existing file. Now, restart
++the system logger.
++
++  svcadm restart system-log
++
++Try to ssh into localhost with ssh asdf@localhost and enter an invalid password.
++Make sure this is logged in the above file. When done, you may configure
++fail2ban.
++
++FAIL2BAN CONFIGURATION
++
++OPT: Edit /etc/fail2ban/fail2ban.conf and change logtarget to /var/adm/fail2ban.log
++REQ: Edit /etc/fail2ban/jail.conf and move down to the [ssh-tcpwrapper] section.
++     Here, set enabled = true and logpath = /var/adm/auth.log. Set the sendmail
++     dest address to something useful or drop the line to stop it spamming you.
++
++START (OR RESTART) FAIL2BAN
++
++Enable the fail2ban service with
++
++  svcadm enable fail2ban
++
++When done, check that all services are running well
++
++  svcs -xv
++
++GOTCHAS AND FIXMES
++
++* It seems the installation may be starting fail2ban automatically. If this is
++  done, fail2ban will not start, but no errors will be returned from svcs
++  (above). Check if it's running with 'ps -ef | grep fail2ban' and manually kill
++  the PID if it is. Re-enable fail2ban and try again
++
++    svcadm disable fail2ban
++    svcadm enable fail2ban
++
++* Fail2ban adds lines like these to /etc/hosts.deny:
++
++    ALL: 1.2.3.4
++
++  wouldn't it be better to just block sshd?
+Index: fail2ban-regex
+===================================================================
+--- fail2ban-regex	(revision 436)
++++ fail2ban-regex	(working copy)
+@@ -1,4 +1,6 @@
+ #!/usr/bin/python
++# vim:ts=4:sw=4:si
++#
+ # This file is part of Fail2Ban.
+ #
+ # Fail2Ban is free software; you can redistribute it and/or modify
+Index: setup.py
+===================================================================
+--- setup.py	(revision 436)
++++ setup.py	(working copy)
+@@ -1,4 +1,5 @@
+ #!/usr/bin/python
++# vim:ts=8:sw=8:si
+ 
+ # This file is part of Fail2Ban.
+ #
+@@ -31,6 +32,7 @@
+ from os.path import isfile, join, isdir
+ from sys import argv
+ from glob import glob
++import os
+ 
+ longdesc = '''
+ Fail2Ban scans log files like /var/log/pwdfail or
+@@ -129,3 +131,7 @@
+ 	print "Please do not forget to update your configuration files."
+ 	print "They are in /etc/fail2ban/."
+ 	print
++
++	osname = os.uname()[0]
++	if osname == "SunOS":
++		print "Please read README.Solaris for installing this as Solaris service"
+Index: files/solaris-10-svc-fail2ban
+===================================================================
+--- files/solaris-10-svc-fail2ban	(revision 0)
++++ files/solaris-10-svc-fail2ban	(revision 467)
+@@ -0,0 +1,46 @@
++#!/usr/bin/bash -e
++#
++# fail2ban		This init.d script is used to start fail2ban.
++# (C) by Hanno Wagner <wagner@rince.de>, License is GPL
++ 
++#set -x
++
++. /lib/svc/share/smf_include.sh
++
++set -e
++
++
++F2B_CONF="/etc/fail2ban/fail2ban.conf"
++if [ -n "$2" ] && [ -f "$F2B_CONF" ]; then
++  F2B_CONF="$2"
++fi
++
++ENV="/usr/bin/env -i LANG=C PATH=/usr/local/bin:/usr/bin:/bin:/opt/sfw/bin:/usr/sfw/bin"
++
++case $1 in
++	start)
++		echo "Starting fail2ban-server with $F2B_CONF"
++		eval $ENV /usr/bin/fail2ban-client start &
++	;;
++	stop)
++		echo "Stopping fail2ban-server with $F2B_CONF"
++		eval $ENV /usr/bin/fail2ban-client stop &
++	;;
++	reload | refresh )
++		echo "Reloading fail2ban-server with $F2B_CONF"
++		eval $ENV /usr/bin/fail2ban-client reload &
++	;;
++	restart | force-reload)
++		echo "Forcing reload of fail2ban-server with $F2B_CONF"
++		eval $ENV /usr/bin/fail2ban-client stop &
++		sleep 2
++		eval $ENV /usr/bin/fail2ban-client start &
++	;;
++	status)
++		/usr/bin/fail2ban-client status &
++	;;
++	*)
++		echo "Usage: /lib/svc/method/svc-fail2ban start|stop|status|refresh|restart|reload|force-reload" >&2
++		exit 2
++	;;
++esac
+Index: files/opensolaris-svc-fail2ban
+===================================================================
+--- files/opensolaris-svc-fail2ban	(revision 0)
++++ files/opensolaris-svc-fail2ban	(revision 467)
+@@ -0,0 +1,46 @@
++#!/usr/bin/bash -e
++#
++# fail2ban		This init.d script is used to start fail2ban.
++# (C) by Hanno Wagner <wagner@rince.de>, License is GPL
++ 
++#set -x
++
++. /lib/svc/share/smf_include.sh
++
++set -e
++
++
++F2B_CONF="/etc/fail2ban/fail2ban.conf"
++if [ -n "$2" ] && [ -f "$F2B_CONF" ]; then
++  F2B_CONF="$2"
++fi
++
++ENV="/usr/bin/env -i LANG=C PATH=/usr/local/bin:/usr/bin:/bin:/opt/sfw/bin:/usr/sfw/bin"
++
++case $1 in
++	start)
++		echo "Starting fail2ban-server with $F2B_CONF"
++		eval $ENV /usr/bin/fail2ban-client start &
++	;;
++	stop)
++		echo "Stopping fail2ban-server with $F2B_CONF"
++		eval $ENV /usr/sfw/bin/fail2ban-client stop &
++	;;
++	reload | refresh )
++		echo "Reloading fail2ban-server with $F2B_CONF"
++		eval $ENV /usr/sfw/bin/fail2ban-client reload &
++	;;
++	restart | force-reload)
++		echo "Forcing reload of fail2ban-server with $F2B_CONF"
++		eval $ENV /usr/sfw/bin/fail2ban-client stop &
++		sleep 2
++		eval $ENV /usr/sfw/bin/fail2ban-client start &
++	;;
++	status)
++		/usr/sfw/bin/fail2ban-client status &
++	;;
++	*)
++		echo "Usage: /lib/svc/method/svc-fail2ban start|stop|status|refresh|restart|reload|force-reload" >&2
++		exit 2
++	;;
++esac
+Index: files/solaris-svc-fail2ban
+===================================================================
+--- files/solaris-svc-fail2ban	(revision 436)
++++ files/solaris-svc-fail2ban	(working copy)
+@@ -1,47 +0,0 @@
+-#!/usr/bin/bash -e
+-#
+-# fail2ban		This init.d script is used to start fail2ban.
+-# (C) by Hanno Wagner <wagner@rince.de>, License is GPL
+- 
+-#set -x
+-
+-. /lib/svc/share/smf_include.sh
+-
+-set -e
+-
+-
+-F2B_CONF="/etc/fail2ban/fail2ban.conf"
+-if [ -n "$2" ] && [ -f "$F2B_CONF" ]; then
+-  F2B_CONF="$2"
+-fi
+-
+-ENV="/usr/bin/env -i LANG=C PATH=/usr/local/bin:/usr/bin:/bin:/opt/sfw/bin:/usr/sfw/bin"
+-
+-case $1 in
+-	start)
+-		[ -f /etc/fail2ban.conf ] || touch /etc/fail2ban.conf
+-		echo "Starting fail2ban-server with $F2B_CONF"
+-		eval $ENV /usr/local/bin/fail2ban-client start &
+-	;;
+-	stop)
+-		echo "Stopping fail2ban-server with $F2B_CONF"
+-		eval $ENV /usr/local/bin/fail2ban-client stop &
+-	;;
+-	reload | refresh )
+-		echo "Reloading fail2ban-server with $F2B_CONF"
+-		eval $ENV /usr/local/bin/fail2ban-client reload &
+-	;;
+-	restart | force-reload)
+-		echo "Forcing reload of fail2ban-server with $F2B_CONF"
+-		eval $ENV /usr/local/bin/fail2ban-client stop &
+-		sleep 2
+-		eval $ENV /usr/local/bin/fail2ban-client start &
+-	;;
+-	status)
+-		/usr/local/bin/fail2ban-client status &
+-	;;
+-	*)
+-		echo "Usage: /lib/svc/method/svc-fail2ban start|stop|status|refresh|restart|reload|force-reload" >&2
+-		exit 2
+-	;;
+-esac
+Index: config/action.d/hostsdeny.conf
+===================================================================
+--- config/action.d/hostsdeny.conf	(revision 436)
++++ config/action.d/hostsdeny.conf	(working copy)
+@@ -44,8 +44,12 @@
+ #          <time>  unix timestamp of the ban time
+ # Values:  CMD
+ #
+-actionunban = IP=<ip> && sed -i.old /ALL:\ $IP/d <file>
++# Original:
++#actionunban = IP=<ip> && sed -i.old /ALL:\ $IP/d <file>
+ 
++# -i is not supported under Solaris 10
++actionunban = IP=<ip> && perl -ne 'print unless (/^ALL:\s$IP/)' -i <file>
++
+ [Init]
+ 
+ # Option:  file
+Index: config/filter.d/sshd.conf
+===================================================================
+--- config/filter.d/sshd.conf	(revision 436)
++++ config/filter.d/sshd.conf	(working copy)
+@@ -26,6 +26,7 @@
+ failregex = ^%(__prefix_line)s(?:error: PAM: )?Authentication failure for .* from <HOST>\s*$
+             ^%(__prefix_line)s(?:error: PAM: )?User not known to the underlying authentication module for .* from <HOST>\s*$
+             ^%(__prefix_line)sFailed (?:password|publickey) for .* from <HOST>(?: port \d*)?(?: ssh\d*)?$
++            ^%(__prefix_line)s\[.*\] Failed keyboard-interactive for .* from <HOST>(?: port \d*)?(?: ssh\d*)?$
+             ^%(__prefix_line)sROOT LOGIN REFUSED.* FROM <HOST>\s*$
+             ^%(__prefix_line)s[iI](?:llegal|nvalid) user .* from <HOST>\s*$
+             ^%(__prefix_line)sUser \S+ from <HOST> not allowed because not listed in AllowUsers$
