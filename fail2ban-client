@@ -299,10 +299,9 @@ class Fail2banClient:
 				sys.stdout.flush()
 				os.mkdir(socketPath)			
 		except OSError:
-			print "Could not create %s" % socketPath
 			sys.stdout.write("Could not create %s\n" % socketPath)
 			sys.stdout.flush()
-			os.exit(-1)
+			return False
 
 	def start(self, argv):
 		# Command line options
