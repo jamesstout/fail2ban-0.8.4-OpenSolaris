@@ -119,6 +119,7 @@ class Fail2banClient:
 				self.__conf["conf"] = opt[1]
 			elif opt[0] == "-s":
 				self.__conf["socket"] = opt[1]
+				self.__createSocketFolder()
 			elif opt[0] == "-d":
 				self.__conf["dump"] = True
 			elif opt[0] == "-v":
@@ -181,6 +182,7 @@ class Fail2banClient:
 				# Do not continue if configuration is not 100% valid
 				if not ret:
 					return False
+				self.__createSocketFolder()
 				# Start the server
 				self.__startServerAsync(self.__conf["socket"],
 										self.__conf["force"])
@@ -285,8 +287,23 @@ class Fail2banClient:
 			cnt += 1
 		if self.__conf["verbose"] > 1:
 			sys.stdout.write('\n')
-			
-	
+
+	#========================
+	# check socket dir exists
+	#========================
+	def __createSocketFolder(self):
+		try:
+			socketPath=os.path.dirname(self.__conf["socket"])
+			if not os.path.isdir(socketPath):
+				sys.stdout.write("%s does not exist, creating\n" % socketPath)
+				sys.stdout.flush()
+				os.mkdir(socketPath)			
+		except OSError:
+			print "Could not create %s" % socketPath
+			sys.stdout.write("Could not create %s\n" % socketPath)
+			sys.stdout.flush()
+			os.exit(-1)
+
 	def start(self, argv):
 		# Command line options
 		self.__argv = argv
