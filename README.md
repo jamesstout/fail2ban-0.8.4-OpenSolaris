@@ -11,6 +11,7 @@ Follow main [README](README) to install but use python2.7:
 
 Then follow the instructions in [README.Solaris](README.Solaris). 
 
-Just note that you may need to:
+<del>Just note that you may need to:
 
-	sudo mkdir /var/run/fail2ban
+	sudo mkdir /var/run/fail2ban 
+</del>
